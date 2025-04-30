@@ -1,0 +1,30 @@
+# .gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+env/
+*.env.*
+!.env.example
+build/
+dist/
+*.egg-info/
+*.vscode/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+# Optional PyCharm files
+.idea/
+*.iml
