@@ -1,4 +1,5 @@
 # app/main.py
+import os
 import typer
 import uvicorn
 import httpx
@@ -18,7 +19,7 @@ from app.models.api import ChatCompletionRequest, ForwarderResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(' ' * 5 + os.path.basename(__file__))
 
 # --- Async Lifecycle for HTTPX client ---
 # Create a global httpx client to reuse connections
@@ -143,14 +144,17 @@ async def forward_chat_completion(
 cli_app = typer.Typer()
 
 @cli_app.command()
-def generate_key(
-    length: int = typer.Option(32, help="Length of the random part of the key.")
-):
-    """Generates a new secure API key for accessing the forwarder service."""
+def generate_key(length: int = typer.Option(32, help="Length of the random part of the key.")):
+    """Generates a new secure API key and saves it to the keys file."""
     new_key = security.generate_api_key(length)
+    keys_path = Path(__file__).parent.parent / "keys" / "forwarder_api_keys"
+    keys_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure keys/ exists
+    with keys_path.open("a") as f:
+        f.write(new_key + "\n")
+    print(f"\n--- Generated API Key ---\n")
     print(f"Generated Forwarder API Key: {new_key}")
-    print("\nAdd this key to the FORWARDER_API_KEYS variable in your .env file (comma-separated).")
-    print(f"Example: FORWARDER_API_KEYS=\"existing_key1,{new_key}\"")
+    print(f"Saved to: {keys_path}\n")
+    print(f"-" * 25 + "\n")
 
 @cli_app.command()
 def run_server(
@@ -170,7 +174,7 @@ def run_server(
     print(f"Auto-reload: {'Enabled' if reload else 'Disabled'}")
     print(f"Allowed Forwarder Keys Loaded: {len(config.settings.allowed_forwarder_keys)}")
     if len(config.settings.allowed_forwarder_keys) > 0 and len(config.settings.allowed_forwarder_keys) < 5:
-         print(f"  Keys: {', '.join([k[:5]+'...' for k in config.settings.allowed_forwarder_keys])}") # Show partial keys if few
+         print(f"  Keys: {', '.join([k[:10]+'...' for k in config.settings.allowed_forwarder_keys])}") # Show partial keys if few
 
     print(f"Backend Provider Status:")
     configured_providers = 0
@@ -183,8 +187,8 @@ def run_server(
     print("-" * 27)
 
     if not config.settings.allowed_forwarder_keys or config.settings.allowed_forwarder_keys == ["fwd_key_replace_me"]:
-        print("\nWARNING: No valid FORWARDER_API_KEYS are configured in .env. The API will not be usable.")
-        print("         Run 'python -m app.main generate-key' and add the key to .env.")
+        print("\nWARNING: No valid FORWARDER_API_KEYS are configured.")
+        print("         Run 'python -m app.main generate-key'")
     if configured_providers == 0:
             print("\nWARNING: No backend provider API keys (e.g., OPENAI_API_KEY) are configured in .env.")
             print("         Forwarding will fail. Add relevant keys to your .env file.")

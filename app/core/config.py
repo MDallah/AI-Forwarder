@@ -1,9 +1,15 @@
 # app/core/config.py
 import os
+import logging
 from typing import List, Optional, Dict, Any
 from pydantic_settings import BaseSettings
 from pydantic import Field, model_validator
 from dotenv import load_dotenv
+from pathlib import Path
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(' ' * 5 + os.path.basename(__file__) )
 
 # Load .env file into environment variables BEFORE loading settings
 # Useful especially when running scripts directly
@@ -14,64 +20,56 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(None, alias='OPENAI_API_KEY')
     anthropic_api_key: Optional[str] = Field(None, alias='ANTHROPIC_API_KEY')
     google_api_key: Optional[str] = Field(None, alias='GOOGLE_API_KEY')
-    # Add other keys here following the pattern: provider_api_key: Optional[str] = Field(None, alias='PROVIDER_API_KEY')
 
-    # Forwarder Keys (keys allowed to access *this* service)
-    # Loaded from FORWARDER_API_KEYS="key1,key2"
-    forwarder_api_keys_str: str = Field("fwd_key_replace_me", alias='FORWARDER_API_KEYS') # Default added to avoid error if not set at all
+    # Forwarder keys (read only from file now)
     allowed_forwarder_keys: List[str] = []
 
     # Optional Base URLs
     openai_base_url: str = "https://api.openai.com/v1"
     anthropic_base_url: str = "https://api.anthropic.com/v1"
-    google_base_url: str = "https://generativelanguage.googleapis.com/v1beta" # Check latest for Gemini
-    # Add other base URLs here
+    google_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
 
-    # Store backend keys and base URLs in dictionaries for easier access
+    # Internal caches
     backend_api_keys: Dict[str, Optional[str]] = {}
     backend_base_urls: Dict[str, str] = {}
 
     @model_validator(mode='after')
     def process_settings(self) -> 'Settings':
-        # Process comma-separated forwarder keys
-        if self.forwarder_api_keys_str:
-            self.allowed_forwarder_keys = [key.strip() for key in self.forwarder_api_keys_str.split(',') if key.strip()]
+        # Load forwarder keys from /keys/forwarder_api_keys.txt
+        keys_file = Path(__file__).parent.parent.parent / "keys" / "forwarder_api_keys"
+        if keys_file.exists():
+            try:
+                with keys_file.open("r") as f:
+                    self.allowed_forwarder_keys = [line.strip() for line in f if line.strip()]
+                    logger.info(f"Loaded {len(self.allowed_forwarder_keys)} forwarder keys from file.")
+            except Exception as e:
+                print(f"Error reading forwarder keys file: {e}")
+                self.allowed_forwarder_keys = []
         else:
-            print("WARNING: No FORWARDER_API_KEYS defined in .env. The forwarder will not be accessible.")
+            print("WARNING: forwarder_api_keys.txt file not found. No keys loaded.")
             self.allowed_forwarder_keys = []
 
-        # Populate backend key dictionary
+        # Backend keys and base URLs
         self.backend_api_keys = {
             "openai": self.openai_api_key,
             "anthropic": self.anthropic_api_key,
             "google": self.google_api_key,
-            # Add other providers here
         }
-        # Populate base URL dictionary
         self.backend_base_urls = {
             "openai": self.openai_base_url,
             "anthropic": self.anthropic_base_url,
             "google": self.google_base_url,
-            # Add other providers here
         }
 
-        # Basic validation: Ensure at least one backend key is set
         if not any(self.backend_api_keys.values()):
-            print("WARNING: No backend AI provider API keys (e.g., OPENAI_API_KEY) found in .env. Forwarding will fail.")
-        
-        # Remove the default key if real keys were loaded
-        if "fwd_key_replace_me" in self.allowed_forwarder_keys and len(self.allowed_forwarder_keys) > 1:
-             self.allowed_forwarder_keys.remove("fwd_key_replace_me")
-        elif self.forwarder_api_keys_str == "fwd_key_replace_me":
-            print("WARNING: Using default placeholder 'fwd_key_replace_me'. Please generate and add real keys to FORWARDER_API_KEYS in .env")
-
+            print("WARNING: No backend API keys set. Forwarding will fail.")
 
         return self
 
     class Config:
         env_file = '.env'
         env_file_encoding = 'utf-8'
-        extra = 'ignore' # Ignore extra fields from .env
+        extra = 'ignore'
 
 settings = Settings()
 
