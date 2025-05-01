@@ -2,8 +2,7 @@
 import httpx
 import json
 import logging
-from typing import Dict, Any, Tuple, Optional
-
+from typing import Dict, Any, Tuple, Optional, List
 from .config import settings, get_provider_info
 from app.models.api import ChatCompletionRequest, ForwarderResponse, ChatMessage
 
@@ -205,6 +204,14 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
             payload["generationConfig"] = generation_config
 
         # Google model name is part of the URL, not payload
+        
+    elif provider == "groq":
+        # Groq uses OpenAI-compatible API
+        payload["model"] = request.model.split(":")[1]
+        payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
+        
+        # Add any Groq-specific parameters here if needed
+        # For now, Groq is fully compatible with OpenAI's format
 
     else:
         # Default or other providers: Assume OpenAI-like for now

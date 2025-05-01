@@ -31,7 +31,7 @@ async def validate_forwarder_key(api_key: str = Depends(API_KEY_HEADER)) -> str:
     key = api_key.split(" ", 1)[1] # Split only once
 
     if key not in settings.allowed_forwarder_keys:
-        print(f"Failed auth attempt with key: {key[:5]}...") # Log redacted key attempt
+        print(f"Failed auth attempt with key: {key[:10]}...") # Log redacted key attempt
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid or unauthorized API Key",

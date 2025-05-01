@@ -101,7 +101,7 @@ async def forward_chat_completion(
             logger.error("HTTP client not initialized during request.")
             raise HTTPException(status_code=503, detail="Service unavailable: HTTP client not initialized.")
 
-    logger.info(f"Received authenticated request for model: {request.model} (Key: {forwarder_key[:5]}...)") # Log model and partial key
+    logger.info(f"Received authenticated request for model: {request.model} (Key: {forwarder_key[:10]}...)") # Log model and partial key
 
     forwarded_response = await forward_request_to_provider(request, lifespan_client)
 
