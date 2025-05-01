@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     google_api_key: Optional[str] = Field(None, alias='GOOGLE_API_KEY')
     groq_api_key: Optional[str] = Field(None, alias='GROQ_API_KEY')  # Add Groq API key
     openrouter_api_key: Optional[str] = Field(None, alias='OPENROUTER_API_KEY')  # Add OpenRouter API key
+    ollama_api_key: Optional[str] = Field(None, alias='OLLAMA_API_KEY')  # Add Ollama API key (optional for Ollama)
 
     # Forwarder keys (read only from file now)
     allowed_forwarder_keys: List[str] = []
@@ -32,6 +33,7 @@ class Settings(BaseSettings):
     google_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     groq_base_url: str = "https://api.groq.com/openai/v1"  # Add Groq base URL
     openrouter_base_url: str = "https://openrouter.ai/api/v1"  # Add OpenRouter base URL
+    ollama_base_url: str = "http://192.168.178.108:11434"  # Add Ollama base URL (default local)
 
     # Internal caches
     backend_api_keys: Dict[str, Optional[str]] = {}
@@ -59,14 +61,16 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_api_key,
             "google": self.google_api_key,
             "groq": self.groq_api_key,
-            "openrouter": self.openrouter_api_key,  # Add OpenRouter to backend API keys
+            "openrouter": self.openrouter_api_key,
+            "ollama": self.ollama_api_key,  # Add Ollama to backend API keys (may be None)
         }
         self.backend_base_urls = {
             "openai": self.openai_base_url,
             "anthropic": self.anthropic_base_url,
             "google": self.google_base_url,
             "groq": self.groq_base_url,
-            "openrouter": self.openrouter_base_url,  # Add OpenRouter to backend base URLs
+            "openrouter": self.openrouter_base_url,
+            "ollama": self.ollama_base_url,  # Add Ollama to backend base URLs
         }
 
         if not any(self.backend_api_keys.values()):
@@ -111,7 +115,7 @@ PROVIDER_MAPPING: Dict[str, Dict[str, Any]] = {
     },
     # Add Groq provider
     # Groq's API structure groq:{model}
-    "groq~": {
+    "groq:": {
         "provider": "groq",
         "endpoint": "/chat/completions",
         "method": "POST",
@@ -119,7 +123,7 @@ PROVIDER_MAPPING: Dict[str, Dict[str, Any]] = {
         "auth_scheme": "Bearer",
     },
     # Add OpenRouter provider
-    "openrouter~": {
+    "openrouter:": {
         "provider": "openrouter",
         "endpoint": "/chat/completions",
         "method": "POST",
@@ -129,6 +133,15 @@ PROVIDER_MAPPING: Dict[str, Dict[str, Any]] = {
             "HTTP-Referer": "https://api-forwarder.example.com",  # Should be customized
             "X-Title": "API Forwarder"  # Should be customized
         }
+    },
+    # Add Ollama provider
+    "ollama:": {
+        "provider": "ollama",
+        "endpoint": "/api/chat",
+        "method": "POST",
+        "auth_header": "Authorization",  # Only used if API key is set
+        "auth_scheme": "Bearer",
+        "auth_optional": True,  # Indicates auth is optional for this provider
     },
     # Add mappings for other providers (Cohere, Mistral, etc.)
 }

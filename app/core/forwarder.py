@@ -30,8 +30,9 @@ async def forward_request_to_provider(
     auth_header_name = provider_info["auth_header"]
     auth_scheme = provider_info.get("auth_scheme") # Optional (like Bearer)
     required_headers = provider_info.get("required_headers", {})
+    auth_optional = provider_info.get("auth_optional", False)  # Check if auth is optional
 
-    if not backend_api_key:
+    if not backend_api_key and not auth_optional:
         return ForwarderResponse(success=False, provider=provider, model_used=model_name, error=f"API key for provider '{provider}' is not configured.")
     if not base_url:
             return ForwarderResponse(success=False, provider=provider, model_used=model_name, error=f"Base URL for provider '{provider}' is not configured.")
@@ -40,11 +41,12 @@ async def forward_request_to_provider(
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     headers.update(required_headers) # Add provider-specific required headers
 
-    # Set Authorization header
-    if auth_scheme:
-        headers[auth_header_name] = f"{auth_scheme} {backend_api_key}"
-    else:
-        headers[auth_header_name] = backend_api_key # Key directly in value
+    # Set Authorization header if API key is available
+    if backend_api_key:
+        if auth_scheme:
+            headers[auth_header_name] = f"{auth_scheme} {backend_api_key}"
+        else:
+            headers[auth_header_name] = backend_api_key # Key directly in value
 
     # --- Prepare Request Body ---
     try:
@@ -125,9 +127,6 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
     if request.top_p is not None:
         payload["top_p"] = request.top_p # Check provider compatibility
 
-    # Handle model field (sometimes in payload, sometimes not)
-    # payload["model"] = request.model # Often needed, but not for Google
-
     # Handle max_tokens (common variations)
     if request.max_tokens is not None:
         if provider == "anthropic":
@@ -153,8 +152,6 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
                 system_prompt = msg.content
             else: # user, assistant
                 # Anthropic expects strictly alternating user/assistant messages
-                # This basic adaptation assumes the input follows this or handles simple cases.
-                # More complex validation/reordering might be needed for robust handling.
                 if msg.content is not None: # Skip messages with null content potentially?
                     anthropic_messages.append({"role": msg.role, "content": msg.content})
 
@@ -207,25 +204,32 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
         
     elif provider == "groq":
         # Groq uses OpenAI-compatible API
-        payload["model"] = request.model.split("~")[1]
+        payload["model"] = request.model.split(":", 1)[1]
         payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
         
-        # Add any Groq-specific parameters here if needed
-        # For now, Groq is fully compatible with OpenAI's format
-
     elif provider == "openrouter":
         # OpenRouter uses OpenAI-compatible API
-        payload["model"] = request.model.split("~")[1]
+        payload["model"] = request.model.split(":", 1)[1]
         payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
         
-        # Add any OpenRouter-specific parameters here if needed
-        # For now, OpenRouter is fully compatible with OpenAI's format
+    elif provider == "ollama":
+        # Clear any existing payload to ensure we have exactly the format needed
+        payload = {}
+        # Extract the model name from the request (format: ollama:modelname)
+        model_name = request.model.split(":", 1)[1] if ":" in request.model else request.model
+        payload["model"] = model_name
+        # Use the messages format for Ollama
+        payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
+        # Always set stream to false
+        payload["stream"] = False
+        # Add temperature if provided
+        if request.temperature is not None:
+            payload["temperature"] = request.temperature
 
     else:
         # Default or other providers: Assume OpenAI-like for now
         payload["model"] = request.model
         payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
-
 
     # Add any provider-specific parameters from extra_body
     if request.extra_body:
@@ -233,6 +237,7 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
         payload.update(request.extra_body)
 
     # Remove stream parameter for now (or handle streaming separately)
-    payload.pop("stream", None) # Remove stream if present, as we don't support it yet
+    if provider != "ollama":  # Keep stream for Ollama as we explicitly set it
+        payload.pop("stream", None)
 
     return payload
