@@ -207,11 +207,19 @@ def adapt_request_payload(provider: str, request: ChatCompletionRequest) -> Dict
         
     elif provider == "groq":
         # Groq uses OpenAI-compatible API
-        payload["model"] = request.model.split(":")[1]
+        payload["model"] = request.model.split("~")[1]
         payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
         
         # Add any Groq-specific parameters here if needed
         # For now, Groq is fully compatible with OpenAI's format
+
+    elif provider == "openrouter":
+        # OpenRouter uses OpenAI-compatible API
+        payload["model"] = request.model.split("~")[1]
+        payload["messages"] = [msg.model_dump(exclude_none=True) for msg in request.messages]
+        
+        # Add any OpenRouter-specific parameters here if needed
+        # For now, OpenRouter is fully compatible with OpenAI's format
 
     else:
         # Default or other providers: Assume OpenAI-like for now

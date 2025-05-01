@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = Field(None, alias='ANTHROPIC_API_KEY')
     google_api_key: Optional[str] = Field(None, alias='GOOGLE_API_KEY')
     groq_api_key: Optional[str] = Field(None, alias='GROQ_API_KEY')  # Add Groq API key
+    openrouter_api_key: Optional[str] = Field(None, alias='OPENROUTER_API_KEY')  # Add OpenRouter API key
 
     # Forwarder keys (read only from file now)
     allowed_forwarder_keys: List[str] = []
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     anthropic_base_url: str = "https://api.anthropic.com/v1"
     google_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     groq_base_url: str = "https://api.groq.com/openai/v1"  # Add Groq base URL
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"  # Add OpenRouter base URL
 
     # Internal caches
     backend_api_keys: Dict[str, Optional[str]] = {}
@@ -56,13 +58,15 @@ class Settings(BaseSettings):
             "openai": self.openai_api_key,
             "anthropic": self.anthropic_api_key,
             "google": self.google_api_key,
-            "groq": self.groq_api_key,  # Add Groq to backend API keys
+            "groq": self.groq_api_key,
+            "openrouter": self.openrouter_api_key,  # Add OpenRouter to backend API keys
         }
         self.backend_base_urls = {
             "openai": self.openai_base_url,
             "anthropic": self.anthropic_base_url,
             "google": self.google_base_url,
-            "groq": self.groq_base_url,  # Add Groq to backend base URLs
+            "groq": self.groq_base_url,
+            "openrouter": self.openrouter_base_url,  # Add OpenRouter to backend base URLs
         }
 
         if not any(self.backend_api_keys.values()):
@@ -107,12 +111,24 @@ PROVIDER_MAPPING: Dict[str, Dict[str, Any]] = {
     },
     # Add Groq provider
     # Groq's API structure groq:{model}
-    "groq:": {
+    "groq~": {
         "provider": "groq",
         "endpoint": "/chat/completions",
         "method": "POST",
         "auth_header": "Authorization",
         "auth_scheme": "Bearer",
+    },
+    # Add OpenRouter provider
+    "openrouter~": {
+        "provider": "openrouter",
+        "endpoint": "/chat/completions",
+        "method": "POST",
+        "auth_header": "Authorization",
+        "auth_scheme": "Bearer",
+        "required_headers": {
+            "HTTP-Referer": "https://api-forwarder.example.com",  # Should be customized
+            "X-Title": "API Forwarder"  # Should be customized
+        }
     },
     # Add mappings for other providers (Cohere, Mistral, etc.)
 }
