@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     google_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     groq_base_url: str = "https://api.groq.com/openai/v1"  # Add Groq base URL
     openrouter_base_url: str = "https://openrouter.ai/api/v1"  # Add OpenRouter base URL
-    ollama_base_url: str = "http://192.168.178.108:11434"  # Add Ollama base URL (default local)
+    ollama_base_url: str = "http://localhost:11434"  # Add Ollama base URL (default local)
 
     # Internal caches
     backend_api_keys: Dict[str, Optional[str]] = {}
