@@ -1,31 +1,40 @@
 # app/models/api.py
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-
-# We'll try to mimic OpenAI's ChatCompletion API structure for simplicity
-# Users can send requests in this format, and we'll adapt them if needed.
+from typing import List, Optional, Dict, Any, Union
 
 class ChatMessage(BaseModel):
-    role: str # "system", "user", "assistant", "tool" (OpenAI specific)
-    content: Optional[str] = None # Content can be None for some roles (e.g., tool calls)
-    # Add tool_calls, tool_call_id etc. if supporting OpenAI functions/tools
+    role: str # "system", "user", "assistant"
+    content: Optional[str] = None # Content is optional (e.g., function calls)
 
 class ChatCompletionRequest(BaseModel):
-    model: str = Field(..., description="The ID of the model to use (e.g., 'gpt-4o', 'claude-3-opus-20240229', 'gemini-1.5-flash').")
+    # Make model optional - will trigger fallback if None/empty
+    model: Optional[str] = Field(None, description="The model to use for the chat completion. If omitted, the server will attempt fallback based on PROVIDERS_PRIORITY.")
     messages: List[ChatMessage]
     temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
     top_p: Optional[float] = None
-    stream: Optional[bool] = False # NOTE: Streaming support is more complex, starting without it
-    # Add other common parameters as needed (stop, presence_penalty, etc.)
-    extra_body: Optional[Dict[str, Any]] = None # For provider-specific params
+    max_tokens: Optional[int] = None
+    stream: Optional[bool] = Field(False, description="Whether to stream the response. NOTE: Streaming is NOT fully supported by the forwarder logic yet.")
+    # Add other common OpenAI parameters as Optional fields
+    stop: Optional[Union[str, List[str]]] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    user: Optional[str] = None
+    # Allow arbitrary provider-specific parameters
+    extra_body: Optional[Dict[str, Any]] = Field(None, description="Provider-specific parameters not part of the standard OpenAI API.")
 
-# A generic response structure, actual content depends on the backend
+    # Example for validation if needed
+    # @validator('temperature')
+    # def temperature_range(cls, v):
+    #     if v is not None and not (0 <= v <= 2):
+    #         raise ValueError('temperature must be between 0 and 2')
+    #     return v
+
 class ForwarderResponse(BaseModel):
+    """Standardized response wrapper for internal handling"""
     success: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
     provider: Optional[str] = None
     model_used: Optional[str] = None
-    status_code: Optional[int] = None # Store status code from backend if error
-    error_details: Optional[Any] = None # Store parsed error details from backend
+    data: Optional[Any] = None # Holds the successful response body from the backend
+    error: Optional[str] = None # Holds a high-level error message
+    status_code: Optional[int] = None # HTTP status code from the backend if an error occurred
+    error_details: Optional[Any] = None # Holds detailed error info (e.g., parsed JSON error from backend)
